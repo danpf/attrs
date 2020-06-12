@@ -3,9 +3,7 @@ from __future__ import absolute_import, division, print_function
 import copy
 import linecache
 import sys
-
 import threading
-
 import uuid
 import warnings
 
@@ -1526,7 +1524,10 @@ def _make_repr(attrs, ns):
         """
         Automatically created by attrs.
         """
-
+        # Since 'self' remains on the stack (i.e.: strongly referenced) for the
+        # duration of this call, it's safe to depend on id(...) stability, and
+        # not need to track the instance and therefore worry about properties
+        # like weakref- or hash-ability.
         if PY2:
             call_key = id(self), threading.current_thread().ident
         else:
@@ -1534,7 +1535,6 @@ def _make_repr(attrs, ns):
 
         if call_key in _repr_running:
             return "..."
-        _repr_running[call_key] = 1
         real_cls = self.__class__
         if ns is None:
             qualname = getattr(real_cls, "__qualname__", None)
@@ -1544,6 +1544,8 @@ def _make_repr(attrs, ns):
                 class_name = real_cls.__name__
         else:
             class_name = ns + "." + real_cls.__name__
+
+        _repr_running[call_key] = 1
         try:
             result = [class_name, "("]
             first = True
@@ -1558,7 +1560,6 @@ def _make_repr(attrs, ns):
             return "".join(result) + ")"
         finally:
             del _repr_running[call_key]
-            # working_set.remove(id(self))
 
     return __repr__
 
