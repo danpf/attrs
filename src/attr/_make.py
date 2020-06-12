@@ -1506,6 +1506,9 @@ def _add_eq(cls, attrs=None):
     return cls
 
 
+_already_repring = threading.local()
+
+
 def _make_repr(attrs, ns):
     """
     Make a repr method that includes relevant *attrs*, adding *ns* to the full
@@ -1520,20 +1523,17 @@ def _make_repr(attrs, ns):
         if a.repr is not False
     )
 
-    def __repr__(self, _repr_running={}):
+    def __repr__(self):
         """
         Automatically created by attrs.
         """
-        # Since 'self' remains on the stack (i.e.: strongly referenced) for the
-        # duration of this call, it's safe to depend on id(...) stability, and
-        # not need to track the instance and therefore worry about properties
-        # like weakref- or hash-ability.
-        if PY2:
-            call_key = id(self), threading.current_thread().ident
-        else:
-            call_key = id(self), threading.get_ident()
+        try:
+            working_set = _already_repring.working_set
+        except AttributeError:
+            working_set = set()
+            _already_repring.working_set = working_set
 
-        if call_key in _repr_running:
+        if id(self) in working_set:
             return "..."
         real_cls = self.__class__
         if ns is None:
@@ -1545,7 +1545,11 @@ def _make_repr(attrs, ns):
         else:
             class_name = ns + "." + real_cls.__name__
 
-        _repr_running[call_key] = 1
+        # Since 'self' remains on the stack (i.e.: strongly referenced) for the
+        # duration of this call, it's safe to depend on id(...) stability, and
+        # not need to track the instance and therefore worry about properties
+        # like weakref- or hash-ability.
+        working_set.add(id(self))
         try:
             result = [class_name, "("]
             first = True
@@ -1559,7 +1563,7 @@ def _make_repr(attrs, ns):
                 )
             return "".join(result) + ")"
         finally:
-            del _repr_running[call_key]
+            working_set.remove(id(self))
 
     return __repr__
 
