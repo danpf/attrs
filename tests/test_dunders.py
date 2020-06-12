@@ -6,6 +6,12 @@ from __future__ import absolute_import, division, print_function
 
 import copy
 import pickle
+# python 2 Pickler is under cPickle
+try:
+    from pickle import _Pickler as Pickler
+except ImportError:
+    from cPickle import Pickler
+from io import BytesIO
 
 import pytest
 
@@ -77,6 +83,11 @@ class InitC(object):
 
 
 InitC = _add_init(InitC, False)
+
+@attr.s
+class HopefullyPickleable(object):
+    value = attr.ib(default=7)
+    cycle = attr.ib(default=None)
 
 
 class TestEqOrder(object):
@@ -258,6 +269,15 @@ class TestAddRepr(object):
         cycle = Cycle()
         cycle.cycle = cycle
         assert "Cycle(value=7, cycle=...)" == repr(cycle)
+
+    def test_thread_local_repr_pickle(self):
+        fh = BytesIO()
+        try:
+            cp = Pickler(fh)
+            cp.dump(HopefullyPickleable)
+            strdata = fh.getvalue()
+        finally:
+            fh.close()
 
     def test_underscores(self):
         """
